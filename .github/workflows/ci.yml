@@ -126,3 +126,108 @@ jobs:
 
     - name: Run security audit
       run: npm audit --audit-level=moderate
+
+  # Job para pruebas de rendimiento con k6
+  performance:
+    runs-on: ubuntu-latest
+    needs: [test]
+    if: github.ref == 'refs/heads/main' || contains(github.event.pull_request.labels.*.name, 'perf')
+    
+    services:
+      mongodb:
+        image: mongo:5.0
+        env:
+          MONGO_INITDB_ROOT_USERNAME: testuser
+          MONGO_INITDB_ROOT_PASSWORD: testpass
+          MONGO_INITDB_DATABASE: testdb
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --eval 'db.adminCommand(\"ping\")'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Install k6
+      run: |
+        sudo gpg -k
+        sudo gpg --no-default-keyring --keyring /usr/share/keyrings/k6-archive-keyring.gpg --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys C5AD17C747E3415A3642D57D77C6C491D6AC1D69
+        echo "deb [signed-by=/usr/share/keyrings/k6-archive-keyring.gpg] https://dl.k6.io/deb stable main" | sudo tee /etc/apt/sources.list.d/k6.list
+        sudo apt-get update
+        sudo apt-get install k6
+
+    - name: Start application in background
+      run: |
+        npm start &
+        sleep 10
+      env:
+        NODE_ENV: test
+        MONGODB_URI: mongodb://testuser:testpass@localhost:27017/testdb?authSource=admin
+        JWT_SECRET: test-secret-key-for-ci
+        PORT: 3000
+
+    - name: Wait for application to be ready
+      run: |
+        timeout 60 bash -c 'until curl -f http://localhost:3000/api/health || curl -f http://localhost:3000; do sleep 2; done'
+
+    - name: Run performance tests - Ramp/Load (Usuarios)
+      run: |
+        k6 run --summary-export=ramp-summary.json tests/k6/scenarios/usuarios-ramp.js
+      env:
+        BASE_URL: http://localhost:3000
+      continue-on-error: true
+
+    - name: Run performance tests - Spike (Servicios)
+      run: |
+        k6 run --summary-export=spike-summary.json tests/k6/scenarios/servicios-spike.js
+      env:
+        BASE_URL: http://localhost:3000
+      continue-on-error: true
+
+    - name: Run performance tests - Soak (Reservas) - Short version for CI
+      run: |
+        k6 run --summary-export=soak-summary.json --env DURATION=5m --env VUS=20 tests/k6/scenarios/reservas-soak.js
+      env:
+        BASE_URL: http://localhost:3000
+      continue-on-error: true
+
+    - name: Run complete performance test suite with custom summary
+      run: |
+        k6 run --summary-export=complete-summary.json tests/k6/performance-test.js
+      env:
+        BASE_URL: http://localhost:3000
+
+    - name: Upload performance test artifacts
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: performance-test-results
+        path: |
+          *-summary.json
+          *-results.json
+          performance-report-*.html
+          performance-summary-*.json
+          performance-junit-*.xml
+
+    - name: Upload performance test logs
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: performance-test-logs
+        path: |
+          logs/
+          *.log
+          k6-*.log

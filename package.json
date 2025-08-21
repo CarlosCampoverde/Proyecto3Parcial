@@ -8,7 +8,14 @@
     "test:ci": "jest --coverage --ci --watchAll=false",
     "test:unit": "jest --testPathPattern=tests",
     "start": "node backend/server.js",
-    "dev": "node backend/server.js"
+    "dev": "node backend/server.js",
+    "perf": "k6 run tests/k6/performance-test.js",
+    "perf:ramp": "k6 run tests/k6/scenarios/usuarios-ramp.js",
+    "perf:spike": "k6 run tests/k6/scenarios/servicios-spike.js",
+    "perf:soak": "k6 run tests/k6/scenarios/reservas-soak.js",
+    "perf:all": "npm run perf:ramp && npm run perf:spike && npm run perf:soak",
+    "perf:simple": "k6 run tests/k6/simple-test.js",
+    "perf:ci": "k6 run --summary-export=performance-ci-summary.json tests/k6/performance-test.js"
   },
   "keywords": [],
   "author": "",
