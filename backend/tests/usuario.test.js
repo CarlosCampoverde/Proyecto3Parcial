@@ -1,13 +1,25 @@
 const request = require('supertest');
 const app = require('../app');
+const Usuario = require('../models/Usuario');
 
 describe('Usuarios API - Registro y Login', () => {
+
+  beforeEach(async () => {
+    // Limpiar la colección de usuarios antes de cada prueba
+    await Usuario.deleteMany({});
+  });
 
   it('debería registrar un nuevo usuario', async () => {
     const res = await request(app).post('/api/usuarios/register')
       .send({
-       
+        nombre: 'NuevoUsuario',
+        email: `nuevo${Date.now()}@mail.com`,
+        password: '123456',
+        rol: 'user'
       });
+
+    console.log('Response body:', res.body);
+    console.log('Response status:', res.statusCode);
 
     expect(res.statusCode).toEqual(200);
     expect(res.body.mensaje).toBeDefined();
