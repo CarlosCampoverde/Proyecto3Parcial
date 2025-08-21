@@ -1,38 +1,63 @@
 # Proyecto3Parcial
 
 [![CI/CD Pipeline](https://github.com/CarlosCampoverde/Proyecto3Parcial/actions/workflows/ci.yml/badge.svg)](https://github.com/CarlosCampoverde/Proyecto3Parcial/actions/workflows/ci.yml)
+[![CD Pipeline](https://github.com/CarlosCampoverde/Proyecto3Parcial/actions/workflows/cd.yml/badge.svg)](https://github.com/CarlosCampoverde/Proyecto3Parcial/actions/workflows/cd.yml)
 [![codecov](https://codecov.io/gh/CarlosCampoverde/Proyecto3Parcial/branch/main/graph/badge.svg)](https://codecov.io/gh/CarlosCampoverde/Proyecto3Parcial)
 
 Sistema de gestión de reservas de gimnasio con backend en Node.js y frontend web.
 
-## 🚀 URLs de Despliegue
+## 🚀 Live Deployment
 
-### 🌐 Producción
-- **Backend API**: https://proyectop2preubas-production.railway.app
-- **Frontend**: https://CarlosCampoverde.github.io/Proyecto3Parcial
-- **API Health Check**: https://proyectop2preubas-production.railway.app/api/health
+### � Production Environment
+- **🌐 Live Application**: [https://proyectop2preubas-production.railway.app](https://proyectop2preubas-production.railway.app)
+- **⚡ API Health Check**: [https://proyectop2preubas-production.railway.app/api/health](https://proyectop2preubas-production.railway.app/api/health)
+- **📊 Railway Dashboard**: [View Deployment](https://railway.app/dashboard)
 
-### 🧪 Staging
-- **Backend API**: https://proyectop2preubas-staging.railway.app
-- **Frontend**: https://deploy-preview-main--proyectop2preubas.netlify.app
+### 🧪 Staging Environment
+- **🔧 Staging API**: [https://proyectop2preubas-staging.railway.app](https://proyectop2preubas-staging.railway.app)
+- **✅ Health Check**: [https://proyectop2preubas-staging.railway.app/api/health](https://proyectop2preubas-staging.railway.app/api/health)
 
-## 🏗️ CI/CD Pipeline
+> **📅 Last Deploy**: Auto-updated by CD pipeline  
+> **🏗️ Infrastructure**: Railway (PostgreSQL + Node.js)  
+> **🔄 Auto-Deploy**: Only on `main` branch when CI + k6 tests pass
 
-Este proyecto implementa un pipeline completo de CI/CD con GitHub Actions:
+## 🏗️ CI/CD Pipeline Architecture
 
-### ✅ **Continuous Integration (CI)**
-- **Pruebas Unitarias**: Jest con cobertura > 70%
-- **Linting**: Verificación de calidad de código
-- **Seguridad**: Auditoría de dependencias vulnerables
-- **Rendimiento**: Pruebas k6 con thresholds estrictos
-- **Multi-Node**: Testing en Node.js 18.x y 20.x
+### ✅ **Continuous Integration (CI)** 
+Ejecuta en cada push/PR:
+
+- **🧪 Unit Tests**: Jest con cobertura > 70%
+- **🔍 Code Quality**: ESLint + formato de código
+- **🛡️ Security Audit**: Verificación de vulnerabilidades
+- **⚡ Performance Tests**: k6 con thresholds estrictos
+- **🐳 Multi-Environment**: Node.js 18.x y 20.x
 
 ### 🚀 **Continuous Deployment (CD)**
-Despliegue automático **solo si CI + k6 pasan**:
+Despliegue condicionado (**solo si CI + k6 = ✅**):
 
-1. **Backend API** → Railway/Render
-2. **Frontend** → Vercel/Netlify/GitHub Pages  
-3. **Docker Image** → GitHub Container Registry
+1. **🔒 Gate Check**: Verifica que CI haya pasado
+2. **🧪 Staging Deploy**: Despliegue a entorno de pruebas
+3. **🔍 Smoke Tests**: Verificación básica en staging
+4. **🌟 Production Deploy**: Despliegue a producción
+5. **✅ Health Checks**: Verificación post-despliegue
+
+#### 🌍 **Environment Protection Rules**
+- **Staging**: Auto-deploy desde main
+- **Production**: Requiere aprobación manual + CI success
+- **Variables separadas** por entorno
+- **Health checks** obligatorios antes de promover
+
+### 📊 **Infrastructure as Code**
+```bash
+# Configurar infraestructura Railway
+./scripts/railway-setup.sh
+
+# Probar despliegues
+./scripts/test-railway-deployment.sh
+
+# Variables de entorno
+source .env.railway
+```
 
 ### 📊 **Pruebas de Rendimiento k6**
 - **RAMP Test**: 10→100 usuarios en 12min (usuarios)
@@ -90,23 +115,53 @@ docker run -p 3000:3000 \
 - **Coverage Reports**: Codecov integration
 - **Error Tracking**: Console logs + GitHub Issues
 
-## 🔐 Variables de Entorno
+## 🔐 GitHub Secrets Configuration
 
-Para despliegue en producción, configurar estos secrets:
+Para que el CD funcione correctamente, configura estos secrets en tu repositorio:
+
+### 🚂 **Railway Secrets**
+```bash
+RAILWAY_TOKEN=your-railway-api-token
+RAILWAY_PROJECT_ID=your-project-id
+```
+
+### 🔑 **Environment Secrets**
+```bash
+# Production
+JWT_SECRET=ultra-secure-production-secret-key-2024
+DATABASE_URL=postgresql://... # Auto-managed by Railway
+
+# Staging  
+JWT_SECRET_STAGING=secure-staging-secret-key-2024
+DATABASE_URL_STAGING=postgresql://... # Auto-managed by Railway
+```
+
+### 📋 **Cómo obtener Railway Token**
+1. Ve a [Railway Dashboard](https://railway.app/dashboard)
+2. Settings → Tokens → Create New Token
+3. Copia el token y agrégalo como secret `RAILWAY_TOKEN`
+4. Obtén Project ID desde la URL del proyecto
+
+## 🛠️ Setup Local para Development
 
 ```bash
-# Backend
-MONGODB_URI=mongodb://...
-JWT_SECRET=your-secret-key
-NODE_ENV=production
+# 1. Clonar repositorio
+git clone https://github.com/CarlosCampoverde/Proyecto3Parcial.git
+cd Proyecto3Parcial
 
-# Deploy Platforms
-RAILWAY_TOKEN=your-railway-token
-VERCEL_TOKEN=your-vercel-token
-NETLIFY_AUTH_TOKEN=your-netlify-token
+# 2. Instalar dependencias
+npm install
 
-# Docker Registry
-GHCR_PAT=your-github-token
+# 3. Configurar variables locales
+cp .env.example .env
+# Editar .env con tus valores
+
+# 4. Ejecutar aplicación
+npm start
+
+# 5. Ejecutar tests
+npm test
+npm run perf:all
 ```
 
 ## � Scripts Disponibles
