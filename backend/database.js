@@ -1,7 +1,20 @@
 require('dotenv').config({ path: __dirname + '/../.env' });
 
 const mongoose = require('mongoose');
-const uri = process.env.MONGO_URI;
+
+// Configurar URI de MongoDB según el entorno
+let uri = process.env.MONGO_URI;
+
+// Si no hay URI configurada y estamos en testing, usar una base de datos en memoria o por defecto
+if (!uri) {
+  if (process.env.NODE_ENV === 'test') {
+    uri = 'mongodb://localhost:27017/gym_web_test';
+    console.log('Using default test database URI');
+  } else {
+    console.warn('MONGO_URI not found in environment variables');
+    uri = 'mongodb://localhost:27017/gym_web_default';
+  }
+}
 
 mongoose.connect(uri)
   .then(() => {
@@ -9,6 +22,12 @@ mongoose.connect(uri)
       console.log('Conectado a MongoDB');
     }
   })
-  .catch(err => console.error('Error en conexión MongoDB:', err));
+  .catch(err => {
+    console.error('Error en conexión MongoDB:', err);
+    // En entorno de testing, no fallar si no se puede conectar a la BD
+    if (process.env.NODE_ENV !== 'test') {
+      process.exit(1);
+    }
+  });
 
 module.exports = mongoose;

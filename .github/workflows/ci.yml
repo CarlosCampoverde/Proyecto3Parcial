@@ -11,6 +11,21 @@ jobs:
   test:
     runs-on: ubuntu-latest
     
+    # Configurar MongoDB como servicio
+    services:
+      mongodb:
+        image: mongo:5.0
+        env:
+          MONGO_INITDB_ROOT_USERNAME: root
+          MONGO_INITDB_ROOT_PASSWORD: password
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd mongo
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    
     strategy:
       matrix:
         node-version: [18.x, 20.x]
@@ -31,11 +46,18 @@ jobs:
     - name: Install dependencies
       run: npm ci
 
-    # 4. Ejecución de pruebas unitarias con cobertura
+    # 4. Configurar variables de entorno para testing
+    - name: Create .env file for testing
+      run: |
+        echo "MONGO_URI=mongodb://root:password@localhost:27017/gym_web_test?authSource=admin" > .env
+        echo "JWT_SECRET=test_secret_123" >> .env
+        echo "NODE_ENV=test" >> .env
+
+    # 5. Ejecución de pruebas unitarias con cobertura
     - name: Run tests
       run: npm run test:ci
 
-    # 5. Publicación de artefactos - Subir reportes de cobertura
+    # 6. Publicación de artefactos - Subir reportes de cobertura
     - name: Upload coverage reports to Codecov
       uses: codecov/codecov-action@v4
       with:
