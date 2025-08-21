@@ -1,10 +1,16 @@
+// backend/routes/reservas-prisma.js
 const express = require('express');
 const router = express.Router();
-const controller = require('../controllers/reservaController');
+const reservaController = require('../controllers/reservaController-prisma');
 const verificarToken = require('../middlewares/verificarToken');
 
-router.post('/', verificarToken, controller.crearReserva);
-router.get('/:usuarioId', controller.obtenerReservasUsuario);
-router.delete('/:id', verificarToken, controller.eliminarReserva);  // <-- agregar esta línea
+// Todas las rutas requieren autenticación
+router.use(verificarToken);
+
+router.post('/', reservaController.crear);
+router.get('/', reservaController.listar);
+router.get('/:id', reservaController.obtenerPorId);
+router.put('/:id', reservaController.actualizar);
+router.delete('/:id', reservaController.eliminar);
 
 module.exports = router;

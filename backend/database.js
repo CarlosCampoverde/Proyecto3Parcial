@@ -1,33 +1,39 @@
-require('dotenv').config({ path: __dirname + '/../.env' });
+// backend/database-prisma.js
+const { PrismaClient } = require('@prisma/client');
 
-const mongoose = require('mongoose');
+const prisma = new PrismaClient({
+  log: process.env.NODE_ENV === 'development' ? ['query', 'info', 'warn', 'error'] : ['error'],
+});
 
-// Configurar URI de MongoDB según el entorno
-let uri = process.env.MONGO_URI;
-
-// Si no hay URI configurada y estamos en testing, usar una base de datos en memoria o por defecto
-if (!uri) {
-  if (process.env.NODE_ENV === 'test') {
-    uri = 'mongodb://localhost:27017/gym_web_test';
-    console.log('Using default test database URI');
-  } else {
-    console.warn('MONGO_URI not found in environment variables');
-    uri = 'mongodb://localhost:27017/gym_web_default';
+// Función para conectar a la base de datos
+async function connectDatabase() {
+  try {
+    await prisma.$connect();
+    console.log('✅ Connected to PostgreSQL database via Prisma');
+  } catch (error) {
+    console.error('❌ Error connecting to database:', error);
+    process.exit(1);
   }
 }
 
-mongoose.connect(uri)
-  .then(() => {
-    if (process.env.NODE_ENV !== 'test') {
-      console.log('Conectado a MongoDB');
-    }
-  })
-  .catch(err => {
-    console.error('Error en conexión MongoDB:', err);
-    // En entorno de testing, no fallar si no se puede conectar a la BD
-    if (process.env.NODE_ENV !== 'test') {
-      process.exit(1);
-    }
-  });
+// Función para desconectar
+async function disconnectDatabase() {
+  await prisma.$disconnect();
+  console.log('📡 Disconnected from database');
+}
 
-module.exports = mongoose;
+// Graceful shutdown
+process.on('beforeExit', async () => {
+  await disconnectDatabase();
+});
+
+process.on('SIGINT', async () => {
+  await disconnectDatabase();
+  process.exit(0);
+});
+
+module.exports = {
+  prisma,
+  connectDatabase,
+  disconnectDatabase
+};

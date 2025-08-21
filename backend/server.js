@@ -1,6 +1,11 @@
+// backend/server.js
 const app = require('./app');
 
-app.listen(3000, () => {
-  console.log('Conectado a MongoDB');
-  console.log('Backend en http://localhost:3000');
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, () => {
+  console.log(`🚀 Servidor corriendo en puerto ${PORT}`);
+  console.log(`📊 Health check: http://localhost:${PORT}/api/health`);
+  console.log(`🏗️  Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`🗄️  Database: PostgreSQL + Prisma`);
 });

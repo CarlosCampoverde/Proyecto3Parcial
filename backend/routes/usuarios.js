@@ -1,8 +1,15 @@
+// backend/routes/usuarios-prisma.js
 const express = require('express');
 const router = express.Router();
-const controller = require('../controllers/usuariocontroller');
+const usuarioController = require('../controllers/usuarioController-prisma');
+const verificarToken = require('../middlewares/verificarToken');
 
-router.post('/register', controller.registrar);
-router.post('/login', controller.login);
+// Rutas públicas
+router.post('/registro', usuarioController.registrar);
+router.post('/login', usuarioController.login);
+
+// Rutas protegidas
+router.get('/perfil', verificarToken, usuarioController.perfil);
+router.get('/', verificarToken, usuarioController.listarUsuarios);
 
 module.exports = router;

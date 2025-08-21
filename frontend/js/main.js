@@ -1,7 +1,10 @@
-const API = 'http://localhost:3000/api';
+// Detectar si estamos en desarrollo o producción
+const API = window.location.hostname === 'localhost' 
+  ? 'http://localhost:3000/api' 
+  : '/api';
 
 function register() {
-  fetch(`${API}/usuarios/register`, {
+  fetch(`${API}/usuarios/registro`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -10,7 +13,16 @@ function register() {
       password: document.getElementById('password').value,
       rol: document.getElementById('rol').value
     })
-  }).then(res => res.json()).then(alert);
+  }).then(res => res.json()).then(data => {
+    if (data.error) {
+      alert('Error: ' + data.error);
+    } else {
+      alert('Usuario registrado exitosamente');
+      window.location = 'login.html';
+    }
+  }).catch(err => {
+    alert('Error de conexión: ' + err.message);
+  });
 }
 
 function login() {
@@ -22,8 +34,14 @@ function login() {
       password: document.getElementById('password').value
     })
   }).then(res => res.json()).then(data => {
-    localStorage.setItem('token', data.token);
-    window.location = 'dashboard.html';
+    if (data.token) {
+      localStorage.setItem('token', data.token);
+      window.location = 'dashboard.html';
+    } else {
+      alert('Error: ' + (data.error || 'Credenciales inválidas'));
+    }
+  }).catch(err => {
+    alert('Error de conexión: ' + err.message);
   });
 }
 
