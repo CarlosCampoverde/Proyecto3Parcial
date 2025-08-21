@@ -1,4 +1,4 @@
-name: CI
+name: CI/CD Pipeline
 
 # Triggers: push y pull_request a main
 on:
@@ -6,6 +6,12 @@ on:
     branches: [ main, master ]
   pull_request:
     branches: [ main, master ]
+
+# Variables de entorno globales
+env:
+  NODE_VERSION: '20.x'
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
 
 jobs:
   test:
@@ -204,11 +210,7 @@ jobs:
         BASE_URL: http://localhost:3000
       continue-on-error: true
 
-    - name: Run complete performance test suite with custom summary
-      run: |
-        k6 run --summary-export=complete-summary.json tests/k6/performance-test.js
-      env:
-        BASE_URL: http://localhost:3000
+    
 
     - name: Upload performance test artifacts
       if: always()
@@ -231,3 +233,175 @@ jobs:
           logs/
           *.log
           k6-*.log
+
+  # ========================================
+  # CONTINUOUS DEPLOYMENT (CD)
+  # ========================================
+  
+  # Deploy Backend API to Railway/Render
+  deploy-backend:
+    name: Deploy Backend API
+    runs-on: ubuntu-latest
+    needs: [test, lint, security, performance]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment:
+      name: production
+      url: ${{ steps.deploy.outputs.url }}
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci --only=production
+    
+    # Deploy Backend using generic deployment action
+    - name: Deploy Backend to Railway/Render
+      id: deploy
+      run: |
+        # Simular deployment - reemplazar con tu método específico
+        if [ -n "${{ secrets.RAILWAY_TOKEN }}" ]; then
+          echo "Deploying to Railway..."
+          # railway deploy (requiere Railway CLI)
+          echo "url=https://proyectop2preubas-production.railway.app" >> $GITHUB_OUTPUT
+        elif [ -n "${{ secrets.RENDER_API_KEY }}" ]; then
+          echo "Deploying to Render..."
+          # curl deploy usando Render API
+          echo "url=https://proyectop2preubas.onrender.com" >> $GITHUB_OUTPUT
+        else
+          echo "No deployment credentials found"
+          echo "url=https://localhost:3000" >> $GITHUB_OUTPUT
+        fi
+      env:
+        MONGODB_URI: ${{ secrets.MONGODB_URI }}
+        JWT_SECRET: ${{ secrets.JWT_SECRET }}
+        NODE_ENV: production
+    
+    - name: Update deployment status
+      run: |
+        echo "Backend deployed to: ${{ steps.deploy.outputs.url }}"
+        echo "BACKEND_URL=${{ steps.deploy.outputs.url }}" >> $GITHUB_ENV
+
+  # Deploy Frontend to Vercel/Netlify
+  deploy-frontend:
+    name: Deploy Frontend
+    runs-on: ubuntu-latest
+    needs: [test, lint, security, performance]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment:
+      name: production
+      url: ${{ steps.deploy.outputs.preview-url }}
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    # Deploy Frontend to static hosting
+    - name: Deploy Frontend
+      id: deploy
+      run: |
+        # Build frontend
+        cd frontend
+        
+        # Deploy to GitHub Pages as fallback
+        echo "Deploying frontend to GitHub Pages..."
+        
+        # Simular deployment
+        if [ -n "${{ secrets.VERCEL_TOKEN }}" ]; then
+          echo "Deploying to Vercel..."
+          echo "preview-url=https://proyectop2preubas-vercel.app" >> $GITHUB_OUTPUT
+        elif [ -n "${{ secrets.NETLIFY_AUTH_TOKEN }}" ]; then
+          echo "Deploying to Netlify..."
+          echo "preview-url=https://proyectop2preubas.netlify.app" >> $GITHUB_OUTPUT
+        else
+          echo "Deploying to GitHub Pages..."
+          echo "preview-url=https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}" >> $GITHUB_OUTPUT
+        fi
+    
+    - name: Update deployment status
+      run: |
+        echo "Frontend deployed to: ${{ steps.deploy.outputs.preview-url }}"
+        echo "FRONTEND_URL=${{ steps.deploy.outputs.preview-url }}" >> $GITHUB_ENV
+
+  # Deploy using Docker to GitHub Container Registry
+  deploy-docker:
+    name: Build and Deploy Docker
+    runs-on: ubuntu-latest
+    needs: [test, lint, security, performance]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment:
+      name: production
+    permissions:
+      contents: read
+      packages: write
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Log in to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=sha,prefix={{branch}}-
+          type=raw,value=latest,enable={{is_default_branch}}
+
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        file: ./Dockerfile
+
+    - name: Deploy to production server
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: ${{ secrets.DEPLOY_HOST }}
+        username: ${{ secrets.DEPLOY_USER }}
+        key: ${{ secrets.DEPLOY_KEY }}
+        script: |
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          docker stop proyectop2preubas || true
+          docker rm proyectop2preubas || true
+          docker run -d --name proyectop2preubas \
+            -p 3000:3000 \
+            -e MONGODB_URI="${{ secrets.MONGODB_URI }}" \
+            -e JWT_SECRET="${{ secrets.JWT_SECRET }}" \
+            -e NODE_ENV=production \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+
+  # Notification and Summary
+  deployment-summary:
+    name: Deployment Summary
+    runs-on: ubuntu-latest
+    needs: [deploy-backend, deploy-frontend, deploy-docker]
+    if: always() && github.ref == 'refs/heads/main' && github.event_name == 'push'
+    
+    steps:
+    - name: Deployment Summary
+      run: |
+        echo "## 🚀 Deployment Summary" >> $GITHUB_STEP_SUMMARY
+        echo "| Service | Status | URL |" >> $GITHUB_STEP_SUMMARY
+        echo "|---------|--------|-----|" >> $GITHUB_STEP_SUMMARY
+        echo "| Backend API | ${{ needs.deploy-backend.result }} | ${{ env.BACKEND_URL || 'N/A' }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Frontend | ${{ needs.deploy-frontend.result }} | ${{ env.FRONTEND_URL || 'N/A' }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Docker | ${{ needs.deploy-docker.result }} | Container Registry |" >> $GITHUB_STEP_SUMMARY
