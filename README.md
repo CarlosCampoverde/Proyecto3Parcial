@@ -1,7 +1,7 @@
-# ProyectoP2Preubas
+# Proyecto3Parcial
 
-[![CI](https://github.com/tu-usuario/ProyectoP2Preubas/actions/workflows/ci.yml/badge.svg)](https://github.com/tu-usuario/ProyectoP2Preubas/actions/workflows/ci.yml)
-[![codecov](https://codecov.io/gh/tu-usuario/ProyectoP2Preubas/branch/main/graph/badge.svg)](https://codecov.io/gh/tu-usuario/ProyectoP2Preubas)
+[![CI](https://github.com/CarlosCampoverde/Proyecto3Parcial/actions/workflows/ci.yml/badge.svg)](https://github.com/CarlosCampoverde/Proyecto3Parcial/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/CarlosCampoverde/Proyecto3Parcial/branch/main/graph/badge.svg)](https://codecov.io/gh/CarlosCampoverde/Proyecto3Parcial)
 
 Sistema de gestión de reservas de gimnasio con backend en Node.js y frontend web.
 
