@@ -63,3 +63,5 @@ Thumbs.db
 # Temporary folders
 tmp/
 temp/
+
+/generated/prisma

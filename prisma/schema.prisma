@@ -1,0 +1,70 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Modelo Usuario
+model Usuario {
+  id        String   @id @default(cuid())
+  nombre    String
+  email     String   @unique
+  password  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relaciones
+  reservas  Reserva[]
+  servicios Servicio[]
+  
+  @@map("usuarios")
+}
+
+// Modelo Servicio
+model Servicio {
+  id          String   @id @default(cuid())
+  nombre      String
+  descripcion String?
+  precio      Float
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relaciones
+  usuario   Usuario   @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  usuarioId String
+  reservas  Reserva[]
+  
+  @@map("servicios")
+}
+
+// Modelo Reserva
+model Reserva {
+  id          String   @id @default(cuid())
+  fechaInicio DateTime
+  fechaFin    DateTime
+  estado      EstadoReserva @default(PENDIENTE)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relaciones
+  usuario    Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  usuarioId  String
+  servicio   Servicio @relation(fields: [servicioId], references: [id], onDelete: Cascade)
+  servicioId String
+  
+  @@map("reservas")
+}
+
+// Enum para estados de reserva
+enum EstadoReserva {
+  PENDIENTE
+  CONFIRMADA
+  CANCELADA
+  COMPLETADA
+}
