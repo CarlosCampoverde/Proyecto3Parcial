@@ -3,17 +3,55 @@ const jwt = require('jsonwebtoken');
 
 exports.crearReserva = async (req, res) => {
   try {
-    const token = req.headers.authorization?.split(' ')[1]; // Extrae solo el token
-    if (!token) return res.status(401).json({ mensaje: 'Token no proporcionado' });
+    const { servicio, fecha, hora } = req.body;
+    
+    // Validar campos requeridos
+    if (!servicio || !fecha || !hora) {
+      return res.status(400).json({ mensaje: 'Todos los campos son obligatorios' });
+    }
 
-    const payload = jwt.verify(token, process.env.JWT_SECRET);
-    const usuarioId = payload.id;
+    // Validar formato de fecha (YYYY-MM-DD)
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) {
+      return res.status(400).json({ mensaje: 'El formato de fecha debe ser YYYY-MM-DD' });
+    }
 
-    const { servicioId, fecha, hora } = req.body;
-    const reserva = new Reserva({ usuarioId, servicioId, fecha, hora });
-    await reserva.save();
+    // Validar que la fecha no sea en el pasado
+    const fechaReserva = new Date(fecha);
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+    if (fechaReserva < hoy) {
+      return res.status(400).json({ mensaje: 'No se pueden hacer reservas para fechas pasadas' });
+    }
 
-    res.json({ mensaje: 'Reserva hecha' });
+    // Validar formato de hora (HH:mm)
+    if (!/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/.test(hora)) {
+      return res.status(400).json({ mensaje: 'El formato de hora debe ser HH:mm' });
+    }
+
+    // Validar horario de atención (8:00 a 20:00)
+    const horaNum = parseInt(hora.split(':')[0]);
+    if (horaNum < 8 || horaNum >= 20) {
+      return res.status(400).json({ mensaje: 'El horario de atención es de 8:00 a 20:00' });
+    }
+
+    // Verificar si ya existe una reserva para la misma fecha y hora
+    const reservaExistente = await Reserva.findOne({ fecha, hora });
+    if (reservaExistente) {
+      return res.status(400).json({ mensaje: 'Ya existe una reserva para esta fecha y hora' });
+    }
+
+    const reserva = new Reserva({
+      usuario: req.usuario.id || req.usuario._id, // Aceptar ambos formatos
+      servicio,
+      fecha,
+      hora
+    });
+    
+    const reservaGuardada = await reserva.save();
+    const reservaCompleta = await Reserva.findById(reservaGuardada._id)
+      .populate('servicio')
+      .populate('usuario', 'nombre email');
+    res.status(201).json(reservaCompleta);
   } catch (error) {
     res.status(500).json({ mensaje: error.message });
   }
@@ -21,7 +59,7 @@ exports.crearReserva = async (req, res) => {
 
 exports.obtenerReservasUsuario = async (req, res) => {
   try {
-    const reservas = await Reserva.find({ usuarioId: req.params.usuarioId }).populate('servicioId');
+    const reservas = await Reserva.find({ usuario: req.usuario.id }).populate('servicio');
     res.json(reservas);
   } catch (error) {
     res.status(500).json({ mensaje: error.message });
@@ -30,8 +68,17 @@ exports.obtenerReservasUsuario = async (req, res) => {
 
 exports.eliminarReserva = async (req, res) => {
   try {
-    const id = req.params.id;
-    await Reserva.findByIdAndDelete(id);
+    const reserva = await Reserva.findById(req.params.id);
+    
+    if (!reserva) {
+      return res.status(404).json({ mensaje: 'Reserva no encontrada' });
+    }
+
+    if (reserva.usuario.toString() !== req.usuario.id) {
+      return res.status(403).json({ mensaje: 'No autorizado para eliminar esta reserva' });
+    }
+
+    await Reserva.findByIdAndDelete(req.params.id);
     res.json({ mensaje: 'Reserva eliminada' });
   } catch (error) {
     res.status(500).json({ mensaje: error.message });
